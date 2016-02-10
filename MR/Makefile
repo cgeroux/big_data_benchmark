@@ -1,6 +1,6 @@
 TARGET=ParseMetaDataMR
 
-INPUTDIR=/user/ubuntu/benchmark/sampleArchive.txt
+INPUTDIR=/user/ubuntu/benchmark/testArchive.txt
 OUTPUTDIR=/user/ubuntu/benchmark/output
 MAINCLASS=${TARGET}
 
