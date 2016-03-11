@@ -1,7 +1,9 @@
 TARGET=ParseMetaDataMR
 
-INPUTDIR=/user/ubuntu/benchmark/testArchive.txt
-OUTPUTDIR=/user/ubuntu/benchmark/output
+LOCALINPUTFILE=../sampleArchive.txt
+INPUTDIR=/user/ubuntu/benchmark/
+INPUTFILE=sampleArchive.txt
+OUTPUTDIR=${INPUTDIR}/output
 MAINCLASS=${TARGET}
 
 ${TARGET}.jar:${TARGET}.class
@@ -10,12 +12,16 @@ ${TARGET}.jar:${TARGET}.class
 ${TARGET}.class:${TARGET}.java
 	hadoop com.sun.tools.javac.Main ${TARGET}.java
 
-run: ${TARGET}.jar cleanoutput
-	hadoop jar ${TARGET}.jar ${MAINCLASS} ${SEARCHSTRING} ${INPUTDIR} ${OUTPUTDIR}
+run: ${TARGET}.jar cleanoutput uploadinputtohdfs
+	hadoop jar ${TARGET}.jar ${MAINCLASS} ${SEARCHSTRING} ${INPUTDIR}${INPUTFILE} ${OUTPUTDIR}
 
 runbg: ${TARGET}.jar cleanoutput
-	hadoop jar ${TARGET}.jar ${MAINCLASS} ${SEARCHSTRING} ${INPUTDIR} ${OUTPUTDIR} &>std_out.txt&
+	hadoop jar ${TARGET}.jar ${MAINCLASS} ${SEARCHSTRING} ${INPUTDIR}${INPUTFILE} ${OUTPUTDIR} &>std_out.txt&
 
+uploadinputtohdfs: ../sampleArchive.txt
+	hdfs dfs -mkdir -p ${INPUTDIR}
+	-hdfs dfs -put ${LOCALINPUTFILE} ${INPUTDIR}${INPUTFILE}
+  
 cleanoutput:
 	-hdfs dfs -rm -R ${OUTPUTDIR}
 
