@@ -21,7 +21,10 @@ runbg: ${TARGET}.jar cleanoutput
 uploadinputtohdfs: ../sampleArchive.txt
 	hdfs dfs -mkdir -p ${INPUTDIR}
 	-hdfs dfs -put ${LOCALINPUTFILE} ${INPUTDIR}${INPUTFILE}
-  
+
+showoutput:
+	hdfs dfs -cat benchmark/output/part-r-00000
+
 cleanoutput:
 	-hdfs dfs -rm -R ${OUTPUTDIR}
 
