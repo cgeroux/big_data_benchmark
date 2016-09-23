@@ -1,8 +1,8 @@
-#!/bin/env python
-from pyspark import SparkContext, SparkConf,SparkFiles
+#!/usr/bin/env python
 
 import random
 import optparse as op
+from subprocess import Popen, PIPE,list2cmdline
 import os
 
 def addParserOptions(parser):
@@ -10,6 +10,8 @@ def addParserOptions(parser):
   """
   
   #these options apply globally
+  parser.add_option("-f",dest="forceOverwrite",default=False,action="store_true"
+    ,help="Forces overwriting of an existing output file [not default].")
   parser.add_option("--line-length",dest="lineLength",type="int",default=80
     ,help="Set the length of lines in the file [default: %default]")
   parser.add_option("--lines-split",dest="splitLines",default=True
@@ -21,8 +23,8 @@ def addParserOptions(parser):
   parser.add_option("--file-size",dest="fileSize",type="int",default=1000
     ,help="The size of the file in bytes [default: %default bytes]")
   parser.add_option("-o",dest="outputFileName",type="string"
-    ,default="generated.txt"
-    ,help="Specify the name of the output file [default: \"%default\"].")
+    ,default="generated.txt",help="Specify the name of the output file "
+    +"and path within HDFS [default: \"%default\"].")
   parser.add_option("--seed-file",dest="seedFile",default=1,help="Seed used "
     +"for randomly choosing words from the dictionary [default: %default].")
   parser.add_option("--dictionary-file",dest="dictionaryFile",type="string"
@@ -36,8 +38,9 @@ def addParserOptions(parser):
     +" random letters for NUMWORDS words of a randomly chosen word length "
     +"between MINWORDLENGTH and MAXWORDLENGTH. See \"Randomly generated "
     +"dictionary options\" [default: %default].")
-  parser.add_option("--num-exe",dest="numExe",default=2
-    ,help="Number of executors to use [default: %default]")
+  parser.add_option("--hdfs-upload-size",dest="hdfsUploadSize",type="int"
+    ,default=100000000
+    ,help="Size in bytes between uploads to HDFS [default: %default].")
     
   randDictGroup=op.OptionGroup(parser,"Randomly generated dictionary options")
   randDictGroup.add_option("--min-word-length",dest="minWordLength",default=1
@@ -55,7 +58,7 @@ def parseOptions():
   """
   
   parser=op.OptionParser(usage="Usage: %prog [options]"
-    ,version="%prog 1.0",description=r"Randomly generates the content of a text file.")
+    ,version="%prog 1.0",description=r"Randomly generates the content of a text file in HDFS.")
   
   #add options
   addParserOptions(parser)
@@ -82,50 +85,36 @@ def createGiberishDict(numWords,minWordLength,maxWordLength,seed=1):
       word+=character
     dictionary[i]=word
   return dictionary
-def loadDictFromFile(sc,fileName):
+def loadDictFromFile(fileName):
   """Loads a dicionary from a file containing words seperated by newline 
   characters.
   """
   
   dictionary={}
   count=0
-  file=sc.textFile("/user/ubuntu/"+fileName)
-  file=file.collect()
-  
-  for line in file:
+  for line in open(fileName,'r'):
     line=line.strip()
     line=line.replace("(a)","")
     if len(line)>0:
       dictionary[count]=line.strip()
       count+=1
   return dictionary
-def checkIn(rank,dictionary,fileSize):
-  lenDict=len(dictionary.value)
-  randomInt=random.randint(0,lenDict)
-  word=dictionary.value[randomInt]
-  fileSize.add(len(word)+1)
-  print("|||:"+str(rank)+" random int="+str(randomInt))
-  print("|||:"+str(rank)+" random word="+str(word))
-def getRandomInt(range):
-  return random.randint(0,range)
-def getWord(x,dictionary):
-  return dictionary.value[x]
-def toLines(x,lineLen):
-  line=""
-  for word in x:
-    line+=word+" "
-    if len(line)>=lineLen:
-      yield line
-def myPrint(x):
-  print("|||: "+str(x))
+def performCommand(cmd,throwOnError=True):
+  #upload file to HDFS
+  process=Popen(cmd,stdout=PIPE,stderr=PIPE)
+  stdout,stderr=process.communicate()
+  returnCode=process.returncode
+  if throwOnError:
+    if (returnCode!=0):
+      raise Exception("error encounter while executing command "
+        +str(cmd)+" got stdout=\""+str(stdout)+"\" and stderr=\""
+        +str(stderr)+"\" and return code="+str(returnCode))
+  
+  return returnCode
 def main():
   
   #parse command line options
   (options,args)=parseOptions()
-  
-  conf=SparkConf().setAppName("create_text_spark")
-  conf.set("spark.executor.instances",str(options.numExe))
-  sc=SparkContext(conf=conf)
   
   #create a dictionary to use to construct the file
   if options.genDict:
@@ -133,58 +122,89 @@ def main():
       ,options.minWordLength,options.maxWordLength
       ,seed=options.seedDict)
   else:
-    dictionary=loadDictFromFile(sc,options.dictionaryFile)
+    dictionary=loadDictFromFile(options.dictionaryFile)
   
-  #set seed for random (not sure how this will work)
-  random.seed(options.seedFile)
+  #should check if the hdfs file is there and remove it if it is
+  cmd=["hdfs","dfs","-stat",options.outputFileName]
+  returnCode=performCommand(cmd,throwOnError=False)#throwOnError=False since we will handle the error here
   
-  #broadcast dictionary to all workers
-  dictionary_BC=sc.broadcast(dictionary)
+  if(returnCode==0):
+    overwrite=False
+    if not options.forceOverwrite:
+      
+      #check if we should overwrite it
+      overWriteResponse=raw_input("File exists, overwrite? (y/n)")
+      if overWriteResponse in ["y","Y","Yes","T","True","1"]:
+        overwrite=True
+    else:
+      overwrite=True
+    
+    #remove the file
+    if overwrite:
+      cmd=["hdfs","dfs","-rm",options.outputFileName]
+      performCommand(cmd)
+    else:
+      print "Not overwriting pre-existing file in HDFS \"" \
+        +options.outputFileName+"\""
+      quit()
   
-  #make the assumption that on average words are 10 characters long
-  numWords=options.fileSize/10
-  
-  #create a number of random integers
-  randomInts=sc.parallelize(range(numWords)).map(lambda x: getRandomInt(len(dictionary_BC.value)))
-  randomInts.foreach(myPrint)
-  
-  #transform the random integers into words using the dictionary
-  randomWords=randomInts.map(lambda x: getWord(x,dictionary_BC))
-  randomWords.foreach(myPrint)
-  
-  #convert words to lines
-  lines=randomWords.mapPartitions(lambda x: toLines(x,options.lineLength))
-  
-  lines.saveAsTextFile("generated.txt")
+  #create the command to upload to HDFS
+  tempFileName="tmp.txt"
+  cmd=["hdfs","dfs","-appendToFile",tempFileName,options.outputFileName]
   
   #create file from the dictionary
-  #fileSize=sc.accumulator(0)
-  #random.seed(options.seedFile)
-  #exeHandles=sc.parallelize(range(numWords))
-  
-  #exeHandles.foreach()
-  #exeHandles.foreach(myPrint)
-  
-  
-  '''
-  while(size<options.fileSize):
+  sizeTotal=0
+  sizeToUpload=0
+  f=open(tempFileName,'w')
+  lenDict=len(dictionary.keys())-1
+  random.seed(options.seedFile)
+  sizePerHDFAppend=options.hdfsUploadSize
+  while(sizeTotal<options.fileSize):
     
+    #create a line to add to the file
     line=""
     lineLen=0
     while(True):
-      wordKey=random.randint(0,lenDict_BC)
-      word=dictionary_BC[wordKey]
+      wordKey=random.randint(0,lenDict)
+      word=dictionary[wordKey]
       lineLen+=len(word)+1
       if lineLen<options.lineLength:
         line+=word+" "
       else:
         break
+    
+    #write the line to the file
     if options.splitLines:
       line+="\n"
     f.write(line)
-    size+=len(line)
+    sizeTotal+=len(line)
+    sizeToUpload+=len(line)
+    
+    #if temporary file big enough upload to HDFS
+    if sizeToUpload>=sizePerHDFAppend:
+      
+      print "uploading "+str(sizeToUpload)+" bytes to hdfs"
+      
+      #close the file
+      f.close()
+      
+      #upload file to HDFS
+      performCommand(cmd)
+      
+      #remove file after upload and open a new file for the next chunk
+      os.remove(tempFileName)
+      f=open(tempFileName,'w')
+      sizeToUpload=0
   
+  #close the temporary file
   f.close()
-  '''
+  
+  #upload any extra content written to the temporary file since last upload
+  if sizeToUpload>0:
+    print "uploading remaining "+str(sizeToUpload)+" bytes to hdfs"
+    performCommand(cmd)
+  
+  #remove temporary file
+  os.remove(tempFileName)
 if __name__ == "__main__":
   main()
