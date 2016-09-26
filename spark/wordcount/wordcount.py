@@ -6,13 +6,13 @@ if len(sys.argv) > 1:
    inputFileName = sys.argv[1]
 else:
    inputFileName = "./generated.txt"
-assert(os.path.exists(inputFileName))
+#assert(os.path.exists(inputFileName))
 
 if len(sys.argv) > 2:
    outputDirectoryName = sys.argv[2]
 else:
-   outputDirectoryName = "./wordcounts"
-assert(not os.path.exists(outputDirectoryName))
+   outputDirectoryName = "wordcounts"
+#assert(not os.path.exists(outputDirectoryName))
 
 conf=SparkConf().setAppName("wordCount")
 sc = SparkContext(conf=conf)
