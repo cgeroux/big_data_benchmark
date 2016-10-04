@@ -1,6 +1,6 @@
 TARGET=LineCount
 
-INPUTDIR=../../input_files/10G_32.txt
+INPUTDIR=../../input_files/10G_8.txt
 #INPUTDIR=./test.txt
 MAINCLASS=${TARGET}
 
@@ -15,7 +15,7 @@ run: bin/${TARGET}.jar
 	echo `date`
 	java -cp bin ${TARGET} ${INPUTDIR} ${OUTPUTDIR}
 	echo `date`
-
+	echo -ne '\007'
 clean:
 	-rm -rf ./bin
 
