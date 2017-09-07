@@ -1,9 +1,10 @@
 #!/bin/env python
-from pyspark import SparkContext, SparkConf,SparkFiles
-
-import random
+from pyspark import SparkContext, SparkConf
 import optparse as op
 import os
+import random
+import glob
+import time
 
 def addParserOptions(parser):
   """Adds command line options
@@ -12,18 +13,12 @@ def addParserOptions(parser):
   #these options apply globally
   parser.add_option("--line-length",dest="lineLength",type="int",default=80
     ,help="Set the length of lines in the file [default: %default]")
-  parser.add_option("--lines-split",dest="splitLines",default=True
-    ,action="store_true"
-    ,help="Separate file into lines of length LINELENGTH or less [default].")
-  parser.add_option("--lines-not-split",dest="splitLines",default=True
-    ,action="store_false"
-    ,help="File will be a single line [not default].")
-  parser.add_option("--file-size",dest="fileSize",type="int",default=1000
+  parser.add_option("--file-size",dest="fileSize",type="int",default=10000
     ,help="The size of the file in bytes [default: %default bytes]")
-  parser.add_option("-o",dest="outputFileName",type="string"
-    ,default="generated.txt"
+  parser.add_option("-o",dest="outputDirName",type="string"
+    ,default="generated_txt"
     ,help="Specify the name of the output file [default: \"%default\"].")
-  parser.add_option("--seed-file",dest="seedFile",default=1,help="Seed used "
+  parser.add_option("--seed",dest="seed",default=1,help="Seed used "
     +"for randomly choosing words from the dictionary [default: %default].")
   parser.add_option("--dictionary-file",dest="dictionaryFile",type="string"
     ,default="english-wordlist.txt"
@@ -31,24 +26,6 @@ def addParserOptions(parser):
     +"to be used as the language dictionary. This option has no effect if "
     +"the option --randomly-generate-dict is specified "
     +"[default: \"%default\"].")
-  parser.add_option("--randomly-generate-dict",dest="genDict",default=False
-    ,action="store_true",help="If set will create a dictionary by selecting"
-    +" random letters for NUMWORDS words of a randomly chosen word length "
-    +"between MINWORDLENGTH and MAXWORDLENGTH. See \"Randomly generated "
-    +"dictionary options\" [default: %default].")
-  parser.add_option("--num-exe",dest="numExe",default=2
-    ,help="Number of executors to use [default: %default]")
-    
-  randDictGroup=op.OptionGroup(parser,"Randomly generated dictionary options")
-  randDictGroup.add_option("--min-word-length",dest="minWordLength",default=1
-    ,type="int",help="Sets the minimum word length [default: %default].")
-  randDictGroup.add_option("--max-word-length",dest="maxWordLength",default=10
-    ,type="int",help="Sets the maximum word length [default: %default].")
-  randDictGroup.add_option("--num-words",dest="numWords",default=1000
-    ,type="int",help="Sets the maximum word length [default: %default].")
-  randDictGroup.add_option("--seed-dict",dest="seedDict",default=1,help="Seed used "
-    +"for randomly generating dictionary [default: %default].")
-  parser.add_option_group(randDictGroup)
 def parseOptions():
   """Parses command line options
   
@@ -62,129 +39,123 @@ def parseOptions():
   
   #parse command line options
   return parser.parse_args()
-def createGiberishDict(numWords,minWordLength,maxWordLength,seed=1):
-  """Creates a dictionary of numWords created by randomly selecting a word 
-  length between minWordLength and maxWordLength and the populating it with 
-  randomly selected lower case letters.
-  """
-  
-  characterLow=97
-  characterHigh=122
-  random.seed(seed)
-  
-  #create a dictionary of words
-  dictionary={}
-  for i in range(numWords):
-    length=random.randint(minWordLength,maxWordLength)
-    word=""
-    for j in range(length):
-      character=chr(random.randint(characterLow,characterHigh))
-      word+=character
-    dictionary[i]=word
-  return dictionary
 def loadDictFromFile(sc,fileName):
-  """Loads a dicionary from a file containing words seperated by newline 
+  """Loads a dictionary from a file containing words separated by newline 
   characters.
   """
   
-  dictionary={}
-  count=0
-  file=sc.textFile("/user/ubuntu/"+fileName)
+  dictionary=[]
+  file=sc.textFile(fileName)
   file=file.collect()
   
   for line in file:
     line=line.strip()
     line=line.replace("(a)","")
     if len(line)>0:
-      dictionary[count]=line.strip()
-      count+=1
+      dictionary.append(line.strip())
   return dictionary
-def checkIn(rank,dictionary,fileSize):
-  lenDict=len(dictionary.value)
-  randomInt=random.randint(0,lenDict)
-  word=dictionary.value[randomInt]
-  fileSize.add(len(word)+1)
-  print("|||:"+str(rank)+" random int="+str(randomInt))
-  print("|||:"+str(rank)+" random word="+str(word))
-def getRandomInt(range):
-  return random.randint(0,range)
-def getWord(x,dictionary):
-  return dictionary.value[x]
 def toLines(x,lineLen):
   line=""
   for word in x:
     line+=word+" "
     if len(line)>=lineLen:
       yield line
-def myPrint(x):
-  print("|||: "+str(x))
+def sizePartition(splitIndex,iterator):
+  numChars=0
+  for x in iterator:
+    numChars+=len(x)
+  yield numChars
+def createWords(splitIndex,iterator,seed,dictionary,partSizes):
+  random.seed(splitIndex+seed)
+  dictSize=len(dictionary)
+  numChars=0
+  while numChars<partSizes[splitIndex]:
+    n=random.randint(0,dictSize-1)
+    word=dictionary[n]+" "#add a space between words
+    numChars+=len(word)
+    yield word
+def combineWordsIntoLines(splitIndex,iterator,lineLength):
+  line=""
+  curLineLength=0
+  for word in iterator:
+    wordLen=len(word)
+    if curLineLength+wordLen>lineLength:
+      yield line
+      line=word
+      curLineLength=wordLen
+    else:
+      line+=word
+      curLineLength+=wordLen
+  yield line
 def main():
   
   #parse command line options
   (options,args)=parseOptions()
   
   conf=SparkConf().setAppName("create_text_spark")
-  conf.set("spark.executor.instances",str(options.numExe))
+  #conf.set("spark.executor.instances",str(options.numExe))
   sc=SparkContext(conf=conf)
+  conf=sc.getConf()
+  print("conf="+str(conf.getAll()))
+  print("defaultMinPartitions="+str(sc.defaultMinPartitions))
+  print("defaultParallelism="+str(sc.defaultParallelism))
   
-  #create a dictionary to use to construct the file
-  if options.genDict:
-    dictionary=createGiberishDict(options.numWords
-      ,options.minWordLength,options.maxWordLength
-      ,seed=options.seedDict)
-  else:
-    dictionary=loadDictFromFile(sc,options.dictionaryFile)
-  
-  #set seed for random (not sure how this will work)
-  random.seed(options.seedFile)
+  #load dictionary
+  dictionary=loadDictFromFile(sc,options.dictionaryFile)
   
   #broadcast dictionary to all workers
-  dictionary_BC=sc.broadcast(dictionary)
+  #dictionary_BC=sc.broadcast(dictionary)
   
-  #make the assumption that on average words are 10 characters long
-  numWords=options.fileSize/10
+  #pick number of partitions based on default amount of parallelism and filesize
+  partFactor=2#how many times the default parallelism. Defaul Parallelism is 
+    #related to the number of cores on the machine.
+  numPartitions=sc.defaultParallelism*partFactor
+  #Decrease the number of partitions if size of file per partition is too small 
+  #(e.g. less than 1KB)
+  while int(options.fileSize/numPartitions)<1000 and numPartitions!=1:
+    numPartitions=int(numPartitions/2)
   
-  #create a number of random integers
-  randomInts=sc.parallelize(range(numWords)).map(lambda x: getRandomInt(len(dictionary_BC.value)))
-  randomInts.foreach(myPrint)
+  #create an RDD with the given number of partitions
+  rdd=sc.parallelize([],numPartitions)#create an RDD with a given number of partitions
+  print("num Partitions="+str(rdd.getNumPartitions()))
   
-  #transform the random integers into words using the dictionary
-  randomWords=randomInts.map(lambda x: getWord(x,dictionary_BC))
-  randomWords.foreach(myPrint)
+  #determine how many characters per partition
+  sizePartMin=int(options.fileSize/numPartitions)
+  partSizes=[]
+  for i in range(numPartitions):
+    partSizes.append(sizePartMin)
+  leftOver=options.fileSize-sizePartMin*numPartitions
+  i=0
+  while leftOver>0:
+    partSizes[i]+=1
+    leftOver-=1
+    i+=1
+  print("partSizes="+str(partSizes))
   
-  #convert words to lines
-  lines=randomWords.mapPartitions(lambda x: toLines(x,options.lineLength))
+  #pick words randomly from dictionary
+  f=lambda x,y: createWords(x,y,options.seed,dictionary,partSizes)
+  result=rdd.mapPartitionsWithIndex(f)
   
-  lines.saveAsTextFile("generated.txt")
+  #print result
+  #print(result.collect())
   
-  #create file from the dictionary
-  #fileSize=sc.accumulator(0)
-  #random.seed(options.seedFile)
-  #exeHandles=sc.parallelize(range(numWords))
+  #Check total size
+  #print("total number of characters="+str(result.mapPartitionsWithIndex(sizePartition).sum()))
   
-  #exeHandles.foreach()
-  #exeHandles.foreach(myPrint)
+  #combine words into lines
+  f=lambda x,y: combineWordsIntoLines(x,y,options.lineLength)
+  lines=result.mapPartitionsWithIndex(f)
+  #lines.cache()#this maybe helpful for timing IO
+  numLines=lines.count()#count the lines so we can compare with line count and to force
+    #evaluation of previous mappings to ensure that the below is just measuring
+    #write time and not evaluation times.
   
-  
-  '''
-  while(size<options.fileSize):
-    
-    line=""
-    lineLen=0
-    while(True):
-      wordKey=random.randint(0,lenDict_BC)
-      word=dictionary_BC[wordKey]
-      lineLen+=len(word)+1
-      if lineLen<options.lineLength:
-        line+=word+" "
-      else:
-        break
-    if options.splitLines:
-      line+="\n"
-    f.write(line)
-    size+=len(line)
-  
-  f.close()
-  '''
+  #save files
+  timeStartWrite=time.time()
+  lines.saveAsTextFile(options.outputDirName)
+  timeEndWrite=time.time()
+  dt=timeEndWrite-timeStartWrite
+  print("write time="+str(dt)+" s")
+  print("number of lines="+str(numLines))
 if __name__ == "__main__":
   main()
