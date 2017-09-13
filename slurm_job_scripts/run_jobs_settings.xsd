@@ -26,6 +26,7 @@
       <xs:extension base="non-empty-str">
         <xs:attribute name="baseJobTime" type="positive-decimal" use="required"/>
         <xs:attribute name="numRuns" type="xs:positiveInteger" default="1"/>
+        <xs:attribute name="skip" type="xs:boolean" default="false"/>
       </xs:extension>
     </xs:simpleContent>
   </xs:complexType>

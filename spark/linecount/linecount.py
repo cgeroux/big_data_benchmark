@@ -36,13 +36,6 @@ def main():
   if len(args) != 2:
    raise Exception("need an input file and an output path")
   
-  conf=SparkConf().setAppName("wordCount")
-  sc = SparkContext(conf=conf)
-  conf=sc.getConf()
-  print("conf="+str(conf.getAll()))
-  print("defaultMinPartitions="+str(sc.defaultMinPartitions))
-  print("defaultParallelism="+str(sc.defaultParallelism))
-  
   #set number of file partitions/parallelism
   if options.numPartitions==None:
     #pick number of partitions based on default amount of parallelism and filesize
@@ -51,6 +44,13 @@ def main():
     numPartitions=sc.defaultParallelism*partFactor
   else:
     numPartitions=options.numPartitions
+  
+  conf=SparkConf().setAppName("wordCount").setMaster("local["+str(numPartitions)+"]")
+  sc = SparkContext(conf=conf)
+  conf=sc.getConf()
+  print("conf="+str(conf.getAll()))
+  print("defaultMinPartitions="+str(sc.defaultMinPartitions))
+  print("defaultParallelism="+str(sc.defaultParallelism))
   
   inputFileName = args[0]
   outputFileName= args[1]

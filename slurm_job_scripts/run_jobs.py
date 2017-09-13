@@ -8,7 +8,7 @@ import copy
 from lxml import etree
 import logging
 logger=logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG
+logging.basicConfig(level=logging.INFO
   ,format="%(levelname)s:%(name)s:%(filename)s:%(funcName)s:%(lineno)d:%(message)s")
 
 __version__="1.0"
@@ -72,11 +72,13 @@ def parseSettings(fileName
   runBenchmarkJobScriptNode=templateJobScriptsNode.find("run-benchmark")
   settings["create-input"]={
     "baseJobTime":createInputJobScriptNode.attrib["baseJobTime"]
-    ,"text":createInputJobScriptNode.text}
+    ,"text":createInputJobScriptNode.text
+    ,"skip":createInputJobScriptNode.attrib["skip"] in ["true",1]}
   settings["run-benchmark"]={
     "baseJobTime":runBenchmarkJobScriptNode.attrib["baseJobTime"]
     ,"text":runBenchmarkJobScriptNode.text
-    ,"numRuns":runBenchmarkJobScriptNode.attrib["numRuns"]}
+    ,"numRuns":runBenchmarkJobScriptNode.attrib["numRuns"]
+    ,"skip":createInputJobScriptNode.attrib["skip"] in ["true",1]}
   
   settings["parameters"]={}
   variablesNode=root.find("parameters")
@@ -183,25 +185,33 @@ def main():
   for testCase in testCases:
     logger.debug(testCase)
     
-    #create data
-    jobScriptFileName=makeJobScriptName("./create-input",testCase)
     replaces=makeStringReplacementsForTestCase(testCase)
-    jobTimeStr=createJobTimeStr(settings["create-input"]["baseJobTime"],testCase)
-    replaces.append(("<job-time>",jobTimeStr))
-    makeJobScript(settings["create-input"]["text"],jobScriptFileName,replaces)
     
-    #submit create date job and get job ID
-    jobID=submitJob(jobScriptFileName)
+    #create data
+    jobID=None
+    if not settings["create-input"]["skip"]:
+      jobScriptFileName=makeJobScriptName("./create-input",testCase)
+      jobTimeStr=createJobTimeStr(settings["create-input"]["baseJobTime"],testCase)
+      replaces.append(("<job-time>",jobTimeStr))
+      makeJobScript(settings["create-input"]["text"],jobScriptFileName,replaces)
+      
+      #submit create date job and get job ID
+      print("submitting job "+jobScriptFileName+" ...")
+      jobID=submitJob(jobScriptFileName)
     
     #run benchmarks
-    del replaces[-1]#remove last job time
-    jobTimeStr=createJobTimeStr(settings["run-benchmark"]["baseJobTime"],testCase)
-    replaces.append(("<job-time>",jobTimeStr))
-    replaces.append(("<create-data-job-ID>",jobID))
-    jobScriptFileName=makeJobScriptName("./run_read-write-benchmark",testCase)
-    makeJobScript(settings["run-benchmark"]["text"],jobScriptFileName,replaces)
-    for i in range(int(settings["run-benchmark"]["numRuns"])):
-      jobID=submitJob(jobScriptFileName,options=["--dependency=afterany:"+str(jobID)])
-    quit()
+    if not settings["run-benchmark"]["skip"]:
+      del replaces[-1]#remove last job time
+      jobTimeStr=createJobTimeStr(settings["run-benchmark"]["baseJobTime"],testCase)
+      replaces.append(("<job-time>",jobTimeStr))
+      jobScriptFileName=makeJobScriptName("./run_read-write-benchmark",testCase)
+      makeJobScript(settings["run-benchmark"]["text"],jobScriptFileName,replaces)
+      for i in range(int(settings["run-benchmark"]["numRuns"])):
+        print("submitting job "+jobScriptFileName+" ...")
+        if jobID==None:
+          jobID=submitJob(jobScriptFileName)
+        else:
+          jobID=submitJob(jobScriptFileName,options=["--dependency=afterany:"+str(jobID)])
+    
 if __name__=="__main__":
   main()
