@@ -75,7 +75,8 @@ def parseSettings(fileName
     ,"text":createInputJobScriptNode.text}
   settings["run-benchmark"]={
     "baseJobTime":runBenchmarkJobScriptNode.attrib["baseJobTime"]
-    ,"text":runBenchmarkJobScriptNode.text}
+    ,"text":runBenchmarkJobScriptNode.text
+    ,"numRuns":runBenchmarkJobScriptNode.attrib["numRuns"]}
   
   settings["parameters"]={}
   variablesNode=root.find("parameters")
@@ -199,7 +200,8 @@ def main():
     replaces.append(("<create-data-job-ID>",jobID))
     jobScriptFileName=makeJobScriptName("./run_read-write-benchmark",testCase)
     makeJobScript(settings["run-benchmark"]["text"],jobScriptFileName,replaces)
-    jobID=submitJob(jobScriptFileName,options=["--dependency=afterany:"+str(jobID)])
+    for i in range(int(settings["run-benchmark"]["numRuns"])):
+      jobID=submitJob(jobScriptFileName,options=["--dependency=afterany:"+str(jobID)])
     quit()
 if __name__=="__main__":
   main()

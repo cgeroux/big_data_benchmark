@@ -9,4 +9,6 @@
 module load spark
 SPARK_BM_ROOT_PATH=/home/cgeroux/test_spark/big_data_benchmark
 SPARK_BM_TMP_PATH=/scratch/cgeroux/spark_input_<spark-partitions.name>_<lustre-stripes.name>
+mkdir -p $SPARK_BM_TMP_PATH
+lfs setstripe -c <lustre-stripes.text> $SPARK_BM_TMP_PATH
 spark-submit --executor-memory 2G $SPARK_BM_ROOT_PATH/input_files/create_text_spark.py --num-partitions=<spark-partitions.text> --file-size=<data-size.text> -o $SPARK_BM_TMP_PATH/<data-size.name>
