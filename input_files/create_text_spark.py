@@ -20,8 +20,14 @@ def addParserOptions(parser):
     ,help="Specify the name of the output file [default: \"%default\"].")
   parser.add_option("--seed",dest="seed",default=1,help="Seed used "
     +"for randomly choosing words from the dictionary [default: %default].")
+  parser.add_option("--num-partitions",dest="numPartitions",type="int",default=None
+    ,help="Number of partitions to split the data into. If not set it chooses "
+    +"a number based on the file size and the default Spark parallelism, "
+    +"usually the number of cores on a node, multiplied by a factor "
+    +"(usually 2).")
+  dictPath=os.path.dirname(os.path.realpath(__file__))
   parser.add_option("--dictionary-file",dest="dictionaryFile",type="string"
-    ,default="english-wordlist.txt"
+    ,default=os.path.join(dictPath,"english-wordlist.txt")
     ,help="Specify a file containing a list of words separated by newlines "
     +"to be used as the language dictionary. This option has no effect if "
     +"the option --randomly-generate-dict is specified "
@@ -45,8 +51,9 @@ def loadDictFromFile(sc,fileName):
   """
   
   dictionary=[]
-  file=sc.textFile(fileName)
-  file=file.collect()
+  #file=sc.textFile(fileName)
+  #file=file.collect()
+  file=open(fileName,"r")
   
   for line in file:
     line=line.strip()
@@ -103,24 +110,25 @@ def main():
   #load dictionary
   dictionary=loadDictFromFile(sc,options.dictionaryFile)
   
-  #broadcast dictionary to all workers
-  #dictionary_BC=sc.broadcast(dictionary)
-  
-  #pick number of partitions based on default amount of parallelism and filesize
-  partFactor=2#how many times the default parallelism. Defaul Parallelism is 
-    #related to the number of cores on the machine.
-  numPartitions=sc.defaultParallelism*partFactor
-  #Decrease the number of partitions if size of file per partition is too small 
-  #(e.g. less than 1KB)
-  while int(options.fileSize/numPartitions)<1000 and numPartitions!=1:
-    numPartitions=int(numPartitions/2)
+  #set number of file partitions/parallelism
+  if options.numPartitions==None:
+    #pick number of partitions based on default amount of parallelism and filesize
+    partFactor=2#how many times the default parallelism. Defaul Parallelism is 
+      #related to the number of cores on the machine.
+    numPartitions=sc.defaultParallelism*partFactor
+    #Decrease the number of partitions if size of file per partition is too small 
+    #(e.g. less than 1KB)
+    while int(options.fileSize/numPartitions)<1000 and numPartitions!=1:
+      numPartitions=int(numPartitions/2)
+  else:
+    numPartitions=options.numPartitions
   
   #create an RDD with the given number of partitions
   rdd=sc.parallelize([],numPartitions)#create an RDD with a given number of partitions
   print("num Partitions="+str(rdd.getNumPartitions()))
   
   #determine how many characters per partition
-  sizePartMin=int(options.fileSize/numPartitions)
+  sizePartMin=int(float(options.fileSize)/float(numPartitions))
   partSizes=[]
   for i in range(numPartitions):
     partSizes.append(sizePartMin)

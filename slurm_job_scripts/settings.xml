@@ -1,0 +1,24 @@
+<settings>
+  <!--<extra-slurm-options></extra-slurm-options>-->
+  <tmp-path>/scratch/cgeroux/spark_bm</tmp-path><!--directory to use for 
+    temporary data while run tests -->
+  <template-job-scripts>
+    <!--baseJobTime in minutes-->
+    <create-input baseJobTime="1">./create_input_template.sh</create-input>
+    <run-benchmark baseJobTime="20">./run_read-write_benchmark_template.sh</run-benchmark>
+  </template-job-scripts>
+  <parameters>
+    <spark-partitions>
+      <value name="1part" timeMult="1.0">1</value>
+      <value name="4part" timeMult="1.0">4</value>
+    </spark-partitions>
+    <lustre-stripes>
+      <value name="1stripe" timeMult="1.0">1</value>
+      <value name="8stripe" timeMult="1.0">8</value>
+    </lustre-stripes>
+    <data-size>
+      <value name="1G" timeMult="1.0">1000000000</value>
+      <value name="10G" timeMult="1.0">10000000000</value>
+    </data-size>
+  </parameters>
+</settings>

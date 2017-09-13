@@ -1,0 +1,97 @@
+<xs:schema 
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  xmlns:cm="cm"
+  delemntFormDefault="qualified">
+  
+  <xs:element name="settings" type="settings-type"></xs:element>
+  
+  <xs:complexType name="settings-type">
+    <xs:all>
+      <xs:element name="extra-slurm-options" type="non-empty-str" minOccurs="0" maxOccurs="1"/>
+      <xs:element name="tmp-path" type="non-empty-str"/>
+      <xs:element name="template-job-scripts" type="template-job-scripts-type" />
+      <xs:element name="parameters" type="parameters-type"/>
+    </xs:all>
+  </xs:complexType>
+  
+  <xs:complexType name="template-job-scripts-type">
+    <xs:all>
+      <xs:element name="create-input" type="template-script-type"/>
+      <xs:element name="run-benchmark" type="template-script-type"/>
+    </xs:all>
+  </xs:complexType>
+  
+  <xs:complexType name="template-script-type">
+    <xs:simpleContent>
+      <xs:extension base="non-empty-str">
+        <xs:attribute name="baseJobTime" type="positive-decimal" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  
+  <xs:complexType name="parameters-type">
+    <xs:all>
+      <xs:element name="spark-partitions" type="spark-partitions-type"/>
+      <xs:element name="lustre-stripes" type="lustre-stripes-type"/>
+      <xs:element name="data-size" type="data-size-type"/>
+    </xs:all>
+  </xs:complexType>
+  
+  <xs:complexType name="spark-partitions-type">
+    <xs:sequence>
+      <xs:element name="value" type="spark-partitions-value-type" minOccurs="1" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+  
+  <xs:complexType name="lustre-stripes-type">
+    <xs:sequence>
+      <xs:element name="value" type="lustre-stripes-value-type" minOccurs="1" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+  
+  <xs:complexType name="data-size-type">
+    <xs:sequence>
+      <xs:element name="value" type="data-size-value-type" minOccurs="1" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+  
+  <xs:complexType name="spark-partitions-value-type">
+    <xs:simpleContent>
+      <xs:extension base="xs:positiveInteger">
+        <xs:attribute name="name" type="non-empty-str" use="required"/>
+        <xs:attribute name="timeMult" type="positive-decimal" default="1.0"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  
+  <xs:complexType name="lustre-stripes-value-type">
+    <xs:simpleContent>
+      <xs:extension base="xs:positiveInteger">
+        <xs:attribute name="name" type="non-empty-str" use="required"/>
+        <xs:attribute name="timeMult" type="positive-decimal" default="1.0"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  
+  <xs:complexType name="data-size-value-type">
+    <xs:simpleContent>
+      <xs:extension base="positive-decimal">
+        <xs:attribute name="name" type="non-empty-str" use="required"/>
+        <xs:attribute name="timeMult" type="positive-decimal" default="1.0"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  
+  <xs:simpleType name="positive-decimal">
+    <xs:restriction base="xs:decimal">
+      <xs:minExclusive value="0.0" />
+    </xs:restriction>
+  </xs:simpleType>
+  
+  <xs:simpleType name="non-empty-str">
+     <xs:restriction base="xs:string">
+       <xs:minLength value="1"/>
+     </xs:restriction>
+  </xs:simpleType>
+  
+</xs:schema>
