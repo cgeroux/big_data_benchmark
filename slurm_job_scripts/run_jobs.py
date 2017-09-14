@@ -78,7 +78,7 @@ def parseSettings(fileName
     "baseJobTime":runBenchmarkJobScriptNode.attrib["baseJobTime"]
     ,"text":runBenchmarkJobScriptNode.text
     ,"numRuns":runBenchmarkJobScriptNode.attrib["numRuns"]
-    ,"skip":createInputJobScriptNode.attrib["skip"] in ["true",1]}
+    ,"skip":runBenchmarkJobScriptNode.attrib["skip"] in ["true",1]}
   
   settings["parameters"]={}
   variablesNode=root.find("parameters")
