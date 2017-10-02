@@ -1,8 +1,13 @@
 #!/bin/bash
-#SBATCH --account=def-cgeroux
-#SBATCH --time=03:00:00
+###SBATCH --account=def-cgeroux
+
+#SBATCH --account=cc-debug_gpu
+#SBATCH --reservation=cc-debug_gpu_6
+#SBATCH --gres=gpu:0
+
+#SBATCH --time=00:10:00
 #SBATCH --nodes=2
-#SBATCH --mem=32000M
+#SBATCH --mem=2000M
 #SBATCH --cpus-per-task=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --job-name=test_multi-node_job
@@ -16,7 +21,7 @@ export SPARK_WORKER_DIR=$SLURM_TMPDIR
 start-master.sh
 
 (
-export SPARK_NO_DAEMONIZE=1;
+#export SPARK_NO_DAEMONIZE=1;
 export -n HOSTNAME;
 
 echo "SLURM_MEM_PER_NODE="${SLURM_MEM_PER_NODE}
@@ -32,7 +37,7 @@ srun -O -x $(hostname) -n $((SLURM_NTASKS -1)) --label --output=$SPARK_LOG_DIR/s
 
 echo $(date): before spark-submit 
 #spark-submit --executor-memory ${SLURM_MEM_PER_NODE}M $SPARK_HOME/examples/src/main/python/pi.py 100000
-SPARK_BM_ROOT_PATH=/home/cgeroux/test_spark/big_data_benchmark
+SPARK_BM_ROOT_PATH=/home/cgeroux/big_data_benchmark
 SPARK_BM_TMP_PATH=/scratch/cgeroux/spark_input_1part_1stripe
 spark-submit --executor-memory ${SLURM_MEM_PER_NODE}M $SPARK_BM_ROOT_PATH/spark/linecount/linecount.py --num-partitions=1 $SPARK_BM_TMP_PATH/1G $SPARK_BM_TMP_PATH/1G_tmp_$SLURM_JOB_ID
 echo $(date): after spark-submit 

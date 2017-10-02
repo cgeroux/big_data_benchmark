@@ -1,13 +1,13 @@
 <settings>
   <template-job-scripts>
     <!--baseJobTime in minutes-->
-    <create-input baseJobTime="180" skip="true">./create_input_template.sh</create-input>
-    <run-benchmark baseJobTime="180" numRuns="1" skip="false">./run_read-write_benchmark_multi-node_template.sh</run-benchmark>
+    <create-input baseJobTime="180" skip="false">./create_input_template.sh</create-input>
+    <run-benchmark baseJobTime="180" numRuns="1" skip="true">./run_read-write_benchmark_multi-node_template.sh</run-benchmark>
   </template-job-scripts>
   <parameters>
     <spark-partitions>
-      <!--<value name="1part" timeMult="1.0">1</value>-->
-      <value name="32part" timeMult="1.0">32</value>
+      <value name="1part" timeMult="1.0">1</value>
+      <!--<value name="32part" timeMult="1.0">32</value>-->
       <!--<value name="64part" timeMult="1.0">64</value>-->
     </spark-partitions>
     <lustre-stripes>
