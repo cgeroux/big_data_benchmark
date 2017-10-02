@@ -7,8 +7,6 @@
   
   <xs:complexType name="settings-type">
     <xs:all>
-      <xs:element name="extra-slurm-options" type="non-empty-str" minOccurs="0" maxOccurs="1"/>
-      <xs:element name="tmp-path" type="non-empty-str"/>
       <xs:element name="template-job-scripts" type="template-job-scripts-type" />
       <xs:element name="parameters" type="parameters-type"/>
     </xs:all>

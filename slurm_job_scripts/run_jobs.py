@@ -59,12 +59,6 @@ def parseSettings(fileName
   
   settings={}
   root=tree.getroot()
-  settings["tmp-path"]=root.find("tmp-path").text
-  extraSlurmOptions=root.find("extra-slurm-options")
-  if extraSlurmOptions!=None:
-    settings["extra-slurm-options"]=extraSlurmOptions
-  else:
-    settings["extra-slurm-options"]=""
   
   #get paths to template job scripts
   templateJobScriptsNode=root.find("template-job-scripts")

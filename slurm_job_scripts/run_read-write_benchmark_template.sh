@@ -3,7 +3,7 @@
 #SBATCH --account=def-cgeroux
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=32
-#SBATCH --mem=128000M
+#SBATCH --mem=128000MB
 #SBATCH --job-name=spark_IO_<spark-partitions.name>_<lustre-stripes.name>_<data-size.name>
 #SBATCH --output=%x-%j.out
 module load spark
