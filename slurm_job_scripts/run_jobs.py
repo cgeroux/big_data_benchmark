@@ -198,7 +198,7 @@ def main():
       del replaces[-1]#remove last job time
       jobTimeStr=createJobTimeStr(settings["run-benchmark"]["baseJobTime"],testCase)
       replaces.append(("<job-time>",jobTimeStr))
-      jobScriptFileName=makeJobScriptName("./run_read-write-benchmark",testCase)
+      jobScriptFileName=makeJobScriptName("./run_read-write-benchmark".replace("_template","").replace(".sh",""),testCase)
       makeJobScript(settings["run-benchmark"]["text"],jobScriptFileName,replaces)
       for i in range(int(settings["run-benchmark"]["numRuns"])):
         print("submitting job "+jobScriptFileName+" ...")

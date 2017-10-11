@@ -6,16 +6,15 @@
 ##SBATCH --gres=gpu:0
 
 #SBATCH --account=def-cgeroux
-#SBATCH --time=00:10:00
+#SBATCH --time=<job-time>
 #SBATCH --nodes=3
-#SBATCH --mem=2000M
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=32
 #SBATCH --ntasks-per-node=1
-#SBATCH --job-name=test_multi-node_job
+#SBATCH --mem=128000MB
+#SBATCH --job-name=spark_IO_multi-node_<spark-partitions.name>_<lustre-stripes.name>_<data-size.name>
 #SBATCH --output=%x-%j.out
 
 module load spark
-#module load python/2.7.13
 
 export SPARK_IDENT_STRING=$SLURM_JOBID
 export SPARK_WORKER_DIR=$SLURM_TMPDIR
@@ -28,8 +27,8 @@ srun -x $(hostname -s) -n $((SLURM_NTASKS -1)) --label --output=$SPARK_LOG_DIR/s
      start-slave.sh -m ${SLURM_MEM_PER_NODE}M -c ${SLURM_CPUS_PER_TASK} spark://$(hostname -f):7077
 ) &
 
-SPARK_BM_ROOT_PATH=/home/cgeroux/big_data_benchmark
-SPARK_BM_TMP_PATH=/scratch/cgeroux/spark_input_1part_1stripe
-spark-submit --executor-memory ${SLURM_MEM_PER_NODE}M $SPARK_BM_ROOT_PATH/spark/linecount/linecount.py --num-partitions=1 $SPARK_BM_TMP_PATH/1G $SPARK_BM_TMP_PATH/1G_tmp_$SLURM_JOB_ID
+source ./paths.sh
+TMP_PATH=$SPARK_BM_TMP_PATH/spark_input_<spark-partitions.name>_<lustre-stripes.name>
+spark-submit --executor-memory ${SLURM_MEM_PER_NODE}M $SPARK_BM_ROOT_PATH/spark/linecount/linecount.py --num-partitions=<spark-partitions.text> $TMP_PATH/<data-size.name> $TMP_PATH/<data-size.name>_tmp_$SLURM_JOB_ID
 
 stop-master.sh

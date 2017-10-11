@@ -7,8 +7,8 @@
 #SBATCH --gres=gpu:0
 
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --mem=2000M
+#SBATCH --ntasks-per-node=12
+#SBATCH --mem=16000M
 #SBATCH --job-name=create_data_<spark-partitions.name>_<lustre-stripes.name>_<data-size.name>
 #SBATCH --output=%x-%j.out
 module load spark
