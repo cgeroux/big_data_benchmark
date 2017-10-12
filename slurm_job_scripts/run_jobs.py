@@ -155,9 +155,9 @@ def submitJob(pathToJobScript,options=[]):
   else:
     logger.info("problem submitting the job, stdout, stderr, and return code "
       +"to follow:")
-    logger.debug("stdout="+str(stdout))
-    logger.debug("stderr="+str(stderr))
-    logger.debug("returnCode="+str(returnCode))
+    logger.info("stdout="+str(stdout))
+    logger.info("stderr="+str(stderr))
+    logger.info("returnCode="+str(returnCode))
   return jobID.strip()
 def main():
   

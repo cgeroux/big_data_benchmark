@@ -7,7 +7,7 @@
 
 #SBATCH --account=def-cgeroux
 #SBATCH --time=<job-time>
-#SBATCH --nodes=3
+#SBATCH --nodes=4
 #SBATCH --cpus-per-task=32
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=128000MB
@@ -29,6 +29,6 @@ srun -x $(hostname -s) -n $((SLURM_NTASKS -1)) --label --output=$SPARK_LOG_DIR/s
 
 source ./paths.sh
 TMP_PATH=$SPARK_BM_TMP_PATH/spark_input_<spark-partitions.name>_<lustre-stripes.name>
-spark-submit --executor-memory ${SLURM_MEM_PER_NODE}M $SPARK_BM_ROOT_PATH/spark/linecount/linecount.py --num-partitions=<spark-partitions.text> $TMP_PATH/<data-size.name> $TMP_PATH/<data-size.name>_tmp_$SLURM_JOB_ID
+spark-submit --deploy-mode cluster --executor-memory ${SLURM_MEM_PER_NODE}M $SPARK_BM_ROOT_PATH/spark/linecount/linecount.py --num-partitions=<spark-partitions.text> $TMP_PATH/<data-size.name> $TMP_PATH/<data-size.name>_tmp_$SLURM_JOB_ID
 
 stop-master.sh
